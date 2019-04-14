@@ -4,5 +4,6 @@ public enum MessageType {
 
     STORE,
     GET,
-    DEL
+    DEL,
+    DEL_ALL
 }

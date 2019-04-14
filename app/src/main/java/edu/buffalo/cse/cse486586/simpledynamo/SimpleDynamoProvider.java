@@ -10,7 +10,9 @@ import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -97,23 +99,28 @@ public class SimpleDynamoProvider extends ContentProvider {
                             break;
 
                         case GET:
-                            String packets = "";
-
-                            if (!msg.getOrigin().equals(MY_PORT)) packets = getGlobalData(msg);
-
-                            /* Send back the retrieved through channel to caller (Previous node) */
-
-                            DataOutputStream dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
-                            dataOutputStream.writeUTF(packets);
-                            dataOutputStream.flush();
-
-                            dataOutputStream.close();
-
-                            break;
+//                            String packets = "";
+//
+//                            if (!msg.getOrigin().equals(MY_PORT)) packets = getGlobalData(msg);
+//
+//                            /* Send back the retrieved through channel to caller (Previous node) */
+//
+//                            DataOutputStream dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+//                            dataOutputStream.writeUTF(packets);
+//                            dataOutputStream.flush();
+//
+//                            dataOutputStream.close();
+//
+//                            break;
 
                         case DEL:
-                            //if (!msg.getOrigin().equals(MY_PORT)) deleteFromRing(msg);
+                            providerHelper.deleteDataByKey(msg);
+                            providerHelper.returnStandardAcknoldegement(clientSocket);
+                            break;
 
+                        case DEL_ALL:
+                            providerHelper.deleteAllLocalData();
+                            providerHelper.returnStandardAcknoldegement(clientSocket);
                             break;
 
                         default:
@@ -126,8 +133,6 @@ public class SimpleDynamoProvider extends ContentProvider {
 
                 } catch (IOException e) {
                     Log.e(TAG, "Client Connection failed");
-                } catch (NoSuchAlgorithmException e) {
-                    Log.e(TAG, "Could not hash!!");
                 }
             }
 
@@ -181,7 +186,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             while(itr.hasNext()){
 
-                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(), itr.next());
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                        String.valueOf(Integer.parseInt(itr.next())*2));
 
             }
 
@@ -195,12 +201,61 @@ public class SimpleDynamoProvider extends ContentProvider {
     }
 
 
-
-
-
 	@Override
 	public int delete(Uri uri, String selection, String[] selectionArgs) {
-		// TODO Auto-generated method stub
+
+        Message message = new Message();
+        message.setMessageType(MessageType.DEL);
+        message.setKey(selection);
+
+        if(selection.equals(Constants.GLOBAL_INDICATOR)){
+
+            /* If *, delete all data from all the nodes */
+
+            message.setMessageType(MessageType.DEL_ALL);
+
+
+            for(Map.Entry<String,String> entry : ringStructure.entrySet()) {
+
+                String value = entry.getValue();
+
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                        String.valueOf(Integer.parseInt(value)*2));
+            }
+
+
+
+        } else if(selection.equals(Constants.LOCAL_INDICATOR)){
+
+            /* If @, delete all data from local node */
+
+            providerHelper.deleteAllLocalData();
+
+        } else{
+
+            /* If others, delete data by key from network */
+
+            try {
+
+                LinkedHashSet<String> targetNodes = providerHelper.getTargetNodesForKey(message, ringStructure);
+
+                Iterator<String> itr = targetNodes.iterator();
+
+                while(itr.hasNext()){
+
+                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                            String.valueOf(Integer.parseInt(itr.next())*2));
+
+                }
+
+            } catch (NoSuchAlgorithmException e) {
+                Log.e(TAG, "Could not hash!!");
+            }
+
+        }
+
+
+
 		return 0;
 	}
 
@@ -222,6 +277,7 @@ public class SimpleDynamoProvider extends ContentProvider {
         message.setOrigin(MY_PORT);
         message.setKey(thisKey);
         message.setValue(thisValue);
+        message.setOriginTimestamp(String.valueOf(System.currentTimeMillis()));
 
 
         saveInRing(message);

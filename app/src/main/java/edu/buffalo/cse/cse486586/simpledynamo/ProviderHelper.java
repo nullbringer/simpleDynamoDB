@@ -11,7 +11,11 @@ import java.net.Socket;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Formatter;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 public class ProviderHelper {
@@ -75,8 +79,48 @@ public class ProviderHelper {
         SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
 
-        editor.putString(message.getKey(), message.getValue());
+        editor.putString(message.getKey() + Constants.KEY_VERSION_SEPARATOR + message.getOriginTimestamp(),
+                message.getValue());
+
         editor.apply();
+    }
+
+    public void deleteAllLocalData(){
+
+        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.clear();
+        editor.apply();
+    }
+
+    public void deleteDataByKey(Message message){
+
+        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+
+        HashSet<String> keysToDelete = new HashSet<String>();
+
+        Map<String, ?> keys = sharedPref.getAll();
+
+        for (Map.Entry<String, ?> entry : keys.entrySet()) {
+
+            if(entry.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0].equals(message.getKey())){
+                keysToDelete.add(entry.getKey());
+
+            }
+
+        }
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+
+        Iterator<String> itr = keysToDelete.iterator();
+
+        while(itr.hasNext()){
+            editor.remove(itr.next());
+
+        }
+
+        editor.apply();
+
     }
 
     public LinkedHashSet<String> getTargetNodesForKey(Message message, TreeMap<String, String> ringStructure) throws NoSuchAlgorithmException {

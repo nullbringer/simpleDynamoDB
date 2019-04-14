@@ -8,8 +8,7 @@ public class Message {
     private String value;
     private String origin;
     private MessageType messageType;
-    private String prevNode;
-    private String nextNode;
+    private String originTimestamp;
 
 
     public String getKey() {
@@ -40,24 +39,16 @@ public class Message {
         return messageType;
     }
 
-    public String getPrevNode() {
-        return prevNode;
-    }
-
-    public void setPrevNode(String prevNode) {
-        this.prevNode = prevNode;
-    }
-
-    public String getNextNode() {
-        return nextNode;
-    }
-
-    public void setNextNode(String nextNode) {
-        this.nextNode = nextNode;
-    }
-
     public void setMessageType(MessageType messageType) {
         this.messageType = messageType;
+    }
+
+    public String getOriginTimestamp() {
+        return originTimestamp;
+    }
+
+    public void setOriginTimestamp(String originTimestamp) {
+        this.originTimestamp = originTimestamp;
     }
 
     public Message() {
@@ -71,16 +62,14 @@ public class Message {
         value = strReceived[1];
         origin = strReceived[2];
         messageType = MessageType.valueOf(strReceived[3]);
-        prevNode = strReceived[4];
-        nextNode = strReceived[5];
+        originTimestamp = strReceived[4];
 
     }
 
     public String createPacket(){
 
         return key + Constants.SEPARATOR + value + Constants.SEPARATOR + origin +
-                Constants.SEPARATOR + messageType.name() + Constants.SEPARATOR + prevNode + Constants.SEPARATOR +
-                nextNode;
+                Constants.SEPARATOR + messageType.name() + Constants.SEPARATOR + originTimestamp;
 
     }
 
@@ -91,8 +80,7 @@ public class Message {
                 ", value='" + value + '\'' +
                 ", origin='" + origin + '\'' +
                 ", messageType=" + messageType +
-                ", prevNode='" + prevNode + '\'' +
-                ", nextNode='" + nextNode + '\'' +
+                ", originTimestamp='" + originTimestamp + '\'' +
                 '}';
     }
 }
