@@ -8,16 +8,19 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.telephony.TelephonyManager;
@@ -31,7 +34,7 @@ public class SimpleDynamoProvider extends ContentProvider {
     private static String MY_PORT;
 	private static TreeMap<String, String> ringStructure = new TreeMap<String, String>();
 
-	private ProviderHelper providerHelper = new ProviderHelper(getContext());
+	private ProviderHelper providerHelper = new ProviderHelper();
 
     @Override
     public boolean onCreate() {
@@ -94,32 +97,27 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 
                         case STORE:
-                            providerHelper.saveKeyPairInDataStore(msg);
+                            providerHelper.saveKeyPairInDataStore(msg, getContext());
                             providerHelper.returnStandardAcknoldegement(clientSocket);
                             break;
 
                         case GET:
-//                            String packets = "";
-//
-//                            if (!msg.getOrigin().equals(MY_PORT)) packets = getGlobalData(msg);
-//
-//                            /* Send back the retrieved through channel to caller (Previous node) */
-//
-//                            DataOutputStream dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
-//                            dataOutputStream.writeUTF(packets);
-//                            dataOutputStream.flush();
-//
-//                            dataOutputStream.close();
-//
-//                            break;
+                            providerHelper.returnPacketAsAcknoldegement(clientSocket,
+                                    providerHelper.getDataByKey(msg, getContext()));
+                            break;
+
+                        case GET_ALL:
+                            providerHelper.returnPacketAsAcknoldegement(clientSocket,
+                                    providerHelper.getAllLocalData(getContext()));
+                            break;
 
                         case DEL:
-                            providerHelper.deleteDataByKey(msg);
+                            providerHelper.deleteDataByKey(msg, getContext());
                             providerHelper.returnStandardAcknoldegement(clientSocket);
                             break;
 
                         case DEL_ALL:
-                            providerHelper.deleteAllLocalData();
+                            providerHelper.deleteAllLocalData(getContext());
                             providerHelper.returnStandardAcknoldegement(clientSocket);
                             break;
 
@@ -147,6 +145,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             String msg = msgs[0];
             int thisPort = Integer.parseInt(msgs[1]);
+            Log.d(TAG,"targetPort::"+thisPort);
 
             String result = "";
 
@@ -163,12 +162,15 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             } catch (SocketTimeoutException e) {
                 Log.e(TAG, "ClientTask SocketTimeoutException");
+                result = Constants.FAILED_NODE_INDICATOR;
 
             } catch (UnknownHostException e) {
                 Log.e(TAG, "ClientTask UnknownHostException");
+                result = Constants.FAILED_NODE_INDICATOR;
 
             } catch (IOException e) {
                 Log.e(TAG, "ClientTask socket IOException: ");
+                result = Constants.FAILED_NODE_INDICATOR;
 
             }
 
@@ -229,7 +231,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             /* If @, delete all data from local node */
 
-            providerHelper.deleteAllLocalData();
+            providerHelper.deleteAllLocalData(getContext());
 
         } else{
 
@@ -261,7 +263,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 	@Override
 	public String getType(Uri uri) {
-		// TODO Auto-generated method stub
+
 		return null;
 	}
 
@@ -289,14 +291,121 @@ public class SimpleDynamoProvider extends ContentProvider {
 	@Override
 	public Cursor query(Uri uri, String[] projection, String selection,
 			String[] selectionArgs, String sortOrder) {
-		// TODO Auto-generated method stub
-		return null;
+
+
+        Log.v("query", selection);
+
+        HashMap<String, String> hm = new HashMap<String, String>();
+
+        Message message = new Message();
+        message.setOrigin(String.valueOf(MY_PORT));
+        message.setMessageType(MessageType.GET);
+        message.setKey(selection);
+
+        if (selection.equals(Constants.GLOBAL_INDICATOR)) {
+
+            //Get all data from all the nodes
+
+            message.setMessageType(MessageType.GET_ALL);
+
+            StringBuilder result= new StringBuilder();
+
+            for(Map.Entry<String,String> entry : ringStructure.entrySet()) {
+
+                String value = entry.getValue();
+
+                try {
+
+                    String returnedDataset = new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                           String.valueOf(Integer.parseInt(value)*2)).get();
+
+                    if(!returnedDataset.equals(Constants.FAILED_NODE_INDICATOR)){
+                        result.append(Constants.LIST_SEPARATOR).append(returnedDataset);
+
+                    }
+
+
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
+            // Get only the latest keypairs
+            hm = providerHelper.convertPacketsToKeyPair(result.toString());
+
+
+        } else if (selection.equals(Constants.LOCAL_INDICATOR)) {
+
+            //Get all data from local node
+
+            String returnedDataset = providerHelper.getAllLocalData(getContext());
+
+            // Get only the latest keypairs
+            hm = providerHelper.convertPacketsToKeyPair(returnedDataset);
+
+        } else {
+
+            // Get data by key from ring
+
+            try {
+
+                LinkedHashSet<String> targetNodes = providerHelper.getTargetNodesForKey(message, ringStructure);
+
+                Iterator<String> itr = targetNodes.iterator();
+
+                while(itr.hasNext()){
+
+                    try {
+
+                        String returnedDataset = new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                                String.valueOf(Integer.parseInt(itr.next())*2)).get();
+
+                        if(!returnedDataset.equals(Constants.FAILED_NODE_INDICATOR)){
+                            hm = providerHelper.convertPacketsToKeyPair(returnedDataset);
+                            break;
+
+                        }
+
+
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+
+            } catch (NoSuchAlgorithmException e) {
+                Log.e(TAG, "Could not hash!!");
+            }
+
+
+
+
+        }
+
+        MatrixCursor cursor = new MatrixCursor(
+                new String[]{Constants.KEY_FIELD, Constants.VALUE_FIELD}
+        );
+
+        for (Map.Entry<String, String> entry : hm.entrySet()) {
+
+            cursor.newRow()
+                    .add(Constants.KEY_FIELD, entry.getKey())
+                    .add(Constants.VALUE_FIELD, entry.getValue());
+        }
+
+        return cursor;
 	}
 
 	@Override
 	public int update(Uri uri, ContentValues values, String selection,
 			String[] selectionArgs) {
-		// TODO Auto-generated method stub
+
 		return 0;
 	}
 

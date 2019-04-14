@@ -18,8 +18,10 @@ public class Constants {
 
 
 
-    public static final int SOCKET_READ_TIMEOUT = 5000;
+    public static final int SOCKET_READ_TIMEOUT = 2000;
     public static final String ACK_VALUE = "Acknowledged";
+
+    public static final String FAILED_NODE_INDICATOR = "FAILED!!!";
 
 
 

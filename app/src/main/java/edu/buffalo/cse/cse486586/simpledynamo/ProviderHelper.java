@@ -2,6 +2,7 @@ package edu.buffalo.cse.cse486586.simpledynamo;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.TextUtils;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -10,22 +11,19 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Formatter;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
 public class ProviderHelper {
 
-
-    private Context context;
-
-    public ProviderHelper(Context context) {
-        this.context = context;
-    }
 
     /*
      * Establish connecton to another node and write send a String
@@ -74,7 +72,7 @@ public class ProviderHelper {
 
     }
 
-    public void saveKeyPairInDataStore(Message message){
+    public void saveKeyPairInDataStore(Message message, Context context){
 
         SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
@@ -85,7 +83,7 @@ public class ProviderHelper {
         editor.apply();
     }
 
-    public void deleteAllLocalData(){
+    public void deleteAllLocalData(Context context){
 
         SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
@@ -93,7 +91,7 @@ public class ProviderHelper {
         editor.apply();
     }
 
-    public void deleteDataByKey(Message message){
+    public void deleteDataByKey(Message message, Context context){
 
         SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
 
@@ -120,6 +118,104 @@ public class ProviderHelper {
         }
 
         editor.apply();
+
+    }
+
+    public HashMap<String, String> convertPacketsToKeyPair(String packets) {
+
+        HashMap<String, String> hm = new HashMap<String, String>();
+
+        List<String> ls = Arrays.asList(packets.split(Constants.LIST_SEPARATOR));
+
+        for (String packet : ls) {
+            if (packet != null && packet.trim().length() > 0) {
+                Message msg = new Message(packet);
+
+                //TODO: put the latest version only, hint: sort increasing, so last value overwrites
+
+                hm.put(msg.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0], msg.getValue());
+
+            }
+        }
+
+        return hm;
+    }
+
+    public String getAllLocalData(Context context) {
+
+        HashMap<String, String> hm = new HashMap<String, String>();
+
+        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+
+        Map<String, ?> keys = sharedPref.getAll();
+
+        for (Map.Entry<String, ?> entry : keys.entrySet()) {
+
+            hm.put(entry.getKey(), entry.getValue().toString());
+
+        }
+
+        return convertMessageListToPacket(hm);
+
+    }
+
+
+    public String getDataByKey(Message message, Context context) {
+
+        HashMap<String, String> hm = new HashMap<String, String>();
+
+        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+
+        Map<String, ?> keys = sharedPref.getAll();
+
+        for (Map.Entry<String, ?> entry : keys.entrySet()) {
+
+            if(entry.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0].equals(message.getKey())){
+                hm.put(entry.getKey(), entry.getValue().toString());
+
+            }
+
+        }
+
+        return convertMessageListToPacket(hm);
+
+    }
+
+    public void returnPacketAsAcknoldegement(Socket clientSocket, String packets) throws IOException{
+
+
+        DataOutputStream dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+        dataOutputStream.writeUTF(packets);
+        dataOutputStream.flush();
+
+        dataOutputStream.close();
+
+    }
+
+
+    public String convertMessageListToPacket(HashMap<String, String> hm) {
+
+
+        List<String> packetList = new ArrayList<String>();
+
+
+        Iterator it = hm.entrySet().iterator();
+
+        while (it.hasNext()) {
+            Map.Entry<String, String> pair = (Map.Entry) it.next();
+
+            Message msg = new Message();
+            msg.setKey(pair.getKey());
+            msg.setValue(pair.getValue());
+            msg.setMessageType(MessageType.GET);
+
+            packetList.add(msg.createPacket());
+
+            it.remove(); // avoids a ConcurrentModificationException
+        }
+
+
+        return TextUtils.join(Constants.LIST_SEPARATOR, packetList);
 
     }
 
