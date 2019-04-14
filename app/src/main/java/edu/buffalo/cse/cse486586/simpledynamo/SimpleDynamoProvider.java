@@ -1,7 +1,7 @@
 package edu.buffalo.cse.cse486586.simpledynamo;
 
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -11,11 +11,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.Context;
@@ -32,6 +31,7 @@ public class SimpleDynamoProvider extends ContentProvider {
     private static final String TAG = SimpleDynamoProvider.class.getName();
 
     private static String MY_PORT;
+    private static String MACHINE_ID;
 	private static TreeMap<String, String> ringStructure = new TreeMap<String, String>();
 
 	private ProviderHelper providerHelper = new ProviderHelper();
@@ -43,8 +43,8 @@ public class SimpleDynamoProvider extends ContentProvider {
         // get my port
 
         TelephonyManager tel = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
-        String portStr = tel.getLine1Number().substring(tel.getLine1Number().length() - 4);
-        MY_PORT = String.valueOf(Integer.parseInt(portStr) * 2);
+        MACHINE_ID = tel.getLine1Number().substring(tel.getLine1Number().length() - 4);
+        MY_PORT = String.valueOf(Integer.parseInt(MACHINE_ID) * 2);
 
         try {
             //initialize ringStructure
@@ -59,6 +59,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             ServerSocket serverSocket = new ServerSocket(Constants.SERVER_PORT);
             new ServerTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, serverSocket);
+
+
+            /* get data from siblings and replicate */
+
+            replicateSiblings();
+
 
         } catch (NoSuchAlgorithmException e) {
             Log.e(TAG,"Could not create Ring structure");
@@ -178,29 +184,7 @@ public class SimpleDynamoProvider extends ContentProvider {
         }
     }
 
-    private void saveInRing(Message message) {
 
-        try {
-
-            LinkedHashSet<String> targetNodes = providerHelper.getTargetNodesForKey(message, ringStructure);
-
-            Iterator<String> itr = targetNodes.iterator();
-
-            while(itr.hasNext()){
-
-                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
-                        String.valueOf(Integer.parseInt(itr.next())*2));
-
-            }
-
-        } catch (NoSuchAlgorithmException e) {
-
-            Log.e(TAG, "Could not hash!!");
-
-        }
-
-
-    }
 
 
 	@Override
@@ -408,5 +392,85 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 		return 0;
 	}
+
+    private void saveInRing(Message message) {
+
+        try {
+
+            LinkedHashSet<String> targetNodes = providerHelper.getTargetNodesForKey(message, ringStructure);
+
+            Iterator<String> itr = targetNodes.iterator();
+
+            while(itr.hasNext()){
+
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                        String.valueOf(Integer.parseInt(itr.next())*2));
+
+            }
+
+        } catch (NoSuchAlgorithmException e) {
+
+            Log.e(TAG, "Could not hash!!");
+
+        }
+
+
+    }
+
+	private void replicateSiblings(){
+
+        try {
+
+            LinkedHashSet<String> siblingNodes = providerHelper.getSiblingNodes(MY_PORT, ringStructure);
+
+
+            Message message = new Message();
+            message.setOrigin(String.valueOf(MY_PORT));
+            message.setMessageType(MessageType.GET_ALL);
+
+            Iterator<String> itr = siblingNodes.iterator();
+
+            StringBuilder result= new StringBuilder();
+
+            while(itr.hasNext()){
+
+                try {
+
+                    String returnedDataset = new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                            String.valueOf(Integer.parseInt(itr.next())*2)).get();
+
+                    if(!returnedDataset.equals(Constants.FAILED_NODE_INDICATOR)){
+                        result.append(Constants.LIST_SEPARATOR).append(returnedDataset);
+
+                    }
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                }
+
+            }
+
+            List<Message>  msgList = providerHelper.convertPacketToMessageList(result.toString());
+
+            for(Message msg: msgList){
+
+
+                LinkedHashSet<String> targetNodes = providerHelper.getTargetNodesForKey(msg, ringStructure);
+
+                if(targetNodes.contains(MACHINE_ID)){
+                    providerHelper.saveKeyPairInDataStore(msg, getContext());
+                }
+
+
+            }
+
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+
+
+    }
 
 }

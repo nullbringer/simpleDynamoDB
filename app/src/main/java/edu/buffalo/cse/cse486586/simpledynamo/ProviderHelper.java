@@ -205,8 +205,12 @@ public class ProviderHelper {
             Map.Entry<String, String> pair = (Map.Entry) it.next();
 
             Message msg = new Message();
-            msg.setKey(pair.getKey());
+
+
+
+            msg.setKey(pair.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0]);
             msg.setValue(pair.getValue());
+            msg.setOriginTimestamp(pair.getKey().split(Constants.KEY_VERSION_SEPARATOR)[1]);
             msg.setMessageType(MessageType.GET);
 
             packetList.add(msg.createPacket());
@@ -216,6 +220,25 @@ public class ProviderHelper {
 
 
         return TextUtils.join(Constants.LIST_SEPARATOR, packetList);
+
+    }
+
+    public List<Message> convertPacketToMessageList(String packets){
+
+        List<Message> msgList = new ArrayList<Message>();
+
+        List<String> ls = Arrays.asList(packets.split(Constants.LIST_SEPARATOR));
+
+        for (String packet : ls) {
+            if (packet != null && packet.trim().length() > 0) {
+                Message msg = new Message(packet);
+
+                msgList.add(msg);
+
+            }
+        }
+
+        return msgList;
 
     }
 
@@ -246,6 +269,33 @@ public class ProviderHelper {
 
         return ringStructure.get(targetHash);
 
+    }
+
+    private String getPrevNode(String key, TreeMap<String, String> ringStructure) throws NoSuchAlgorithmException{
+
+        String hashedKey = genHash(key);
+
+        String targetHash  = ringStructure.lowerKey(hashedKey);
+
+        if(targetHash == null){
+            targetHash = ringStructure.lastKey();
+        }
+
+        return ringStructure.get(targetHash);
+
+    }
+
+    public LinkedHashSet<String> getSiblingNodes(String myPort , TreeMap<String, String> ringStructure) throws NoSuchAlgorithmException {
+
+        String machineId = String.valueOf(Integer.parseInt(myPort)/2);
+
+
+        LinkedHashSet<String> targetNodes = new LinkedHashSet<String>();
+
+        targetNodes.add(getNextNode(machineId,ringStructure));
+        targetNodes.add(getPrevNode(machineId,ringStructure));
+
+        return targetNodes;
     }
 
 
