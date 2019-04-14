@@ -13,10 +13,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Formatter;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -121,21 +124,34 @@ public class ProviderHelper {
 
     }
 
-    public HashMap<String, String> convertPacketsToKeyPair(String packets) {
+    public LinkedHashMap<String, String> convertPacketsToKeyPair(String packets) {
 
-        HashMap<String, String> hm = new HashMap<String, String>();
+        LinkedHashMap<String, String> hm = new LinkedHashMap<String, String>();
 
         List<String> ls = Arrays.asList(packets.split(Constants.LIST_SEPARATOR));
+
+
+
+
+        List<Message> messageList = new ArrayList<Message>();
+
+
 
         for (String packet : ls) {
             if (packet != null && packet.trim().length() > 0) {
                 Message msg = new Message(packet);
 
-                //TODO: put the latest version only, hint: sort increasing, so last value overwrites
-
-                hm.put(msg.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0], msg.getValue());
+                messageList.add(msg);
 
             }
+        }
+
+        /* sorting the list so that highest version overwrites the lower values in hashmap */
+        Collections.sort(messageList);
+
+        for (Message msg : messageList) {
+                hm.put(msg.getKey(), msg.getValue());
+
         }
 
         return hm;

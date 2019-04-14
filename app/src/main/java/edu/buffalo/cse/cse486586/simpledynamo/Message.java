@@ -2,7 +2,7 @@ package edu.buffalo.cse.cse486586.simpledynamo;
 
 
 
-public class Message {
+public class Message implements Comparable<Message> {
 
     private String key;
     private String value;
@@ -83,4 +83,19 @@ public class Message {
                 ", originTimestamp='" + originTimestamp + '\'' +
                 '}';
     }
+
+    @Override
+    public int compareTo(Message another) {
+
+
+
+        int result = this.key.compareTo(another.key);
+
+        if(result == 0){
+            result = this.originTimestamp.compareTo(another.originTimestamp);
+        }
+
+        return result;
+    }
+
 }

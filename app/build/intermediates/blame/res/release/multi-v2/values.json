@@ -6,30 +6,25 @@
                 {
                     "source": "/Users/amlan/Documents/codebase/github/UB_Courses/CSE_586_Distributed_Systems/PA4/SimpleDynamo/app/src/main/res/values/styles.xml",
                     "from": {
-                        "startLines": "6,15",
-                        "startColumns": "4,4",
-                        "startOffsets": "186,510",
-                        "endLines": "12,17",
-                        "endColumns": "12,12",
-                        "endOffsets": "472,665"
+                        "startLines": "-1,-1",
+                        "startColumns": "-1,-1",
+                        "startOffsets": "-1,-1"
                     },
                     "to": {
-                        "startLines": "6,13",
+                        "startLines": "10,13",
                         "startColumns": "4,4",
-                        "startOffsets": "272,563",
+                        "startOffsets": "458,541",
                         "endLines": "12,15",
                         "endColumns": "12,12",
-                        "endOffsets": "558,718"
+                        "endOffsets": "536,608"
                     }
                 },
                 {
                     "source": "/Users/amlan/Documents/codebase/github/UB_Courses/CSE_586_Distributed_Systems/PA4/SimpleDynamo/app/src/main/res/values/dimens.xml",
                     "from": {
-                        "startLines": "3,4",
-                        "startColumns": "4,4",
-                        "startOffsets": "89,147",
-                        "endColumns": "57,55",
-                        "endOffsets": "142,198"
+                        "startLines": "-1,-1",
+                        "startColumns": "-1,-1",
+                        "startOffsets": "-1,-1"
                     },
                     "to": {
                         "startLines": "2,3",
@@ -42,18 +37,18 @@
                 {
                     "source": "/Users/amlan/Documents/codebase/github/UB_Courses/CSE_586_Distributed_Systems/PA4/SimpleDynamo/app/src/main/res/values/strings.xml",
                     "from": {
-                        "startLines": "4,3",
-                        "startColumns": "4,4",
-                        "startOffsets": "106,56",
-                        "endColumns": "52,49",
-                        "endOffsets": "154,101"
+                        "startLines": "-1,-1,8,6,5,7",
+                        "startColumns": "-1,-1,4,4,4,4",
+                        "startOffsets": "-1,-1,298,206,159,253",
+                        "endColumns": "-1,-1,46,46,46,44",
+                        "endOffsets": "-1,-1,340,248,201,293"
                     },
                     "to": {
-                        "startLines": "4,5",
-                        "startColumns": "4,4",
-                        "startOffsets": "169,222",
-                        "endColumns": "52,49",
-                        "endOffsets": "217,267"
+                        "startLines": "4,5,6,7,8,9",
+                        "startColumns": "4,4,4,4,4,4",
+                        "startOffsets": "169,222,272,319,366,413",
+                        "endColumns": "52,49,46,46,46,44",
+                        "endOffsets": "217,267,314,361,408,453"
                     }
                 }
             ]

@@ -10,6 +10,7 @@ import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -279,7 +280,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
         Log.v("query", selection);
 
-        HashMap<String, String> hm = new HashMap<String, String>();
+        LinkedHashMap<String, String> hm = new LinkedHashMap<String, String>();
 
         Message message = new Message();
         message.setOrigin(String.valueOf(MY_PORT));
