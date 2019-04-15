@@ -453,6 +453,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             }
 
+            providerHelper.deleteAllLocalData(getContext());
+
             List<Message>  msgList = providerHelper.convertPacketToMessageList(result.toString());
 
             for(Message msg: msgList){
