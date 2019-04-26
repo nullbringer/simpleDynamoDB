@@ -8,6 +8,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -48,6 +49,13 @@ public class SimpleDynamoProvider extends ContentProvider {
         MY_PORT = String.valueOf(Integer.parseInt(MACHINE_ID) * 2);
 
         try {
+
+
+            //TODO: clear all local data commentede
+            //providerHelper.deleteAllLocalData(getContext());
+
+
+
             //initialize ringStructure
             ringStructure.put(providerHelper.genHash("5554"),"5554");
             ringStructure.put(providerHelper.genHash("5556"),"5556");
@@ -278,7 +286,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			String[] selectionArgs, String sortOrder) {
 
 
-        Log.v("query", selection);
+        //Log.v("query", selection);
 
         LinkedHashMap<String, String> hm = new LinkedHashMap<String, String>();
 
@@ -340,18 +348,36 @@ public class SimpleDynamoProvider extends ContentProvider {
 
                 LinkedHashSet<String> targetNodes = providerHelper.getTargetNodesForKey(message, ringStructure);
 
+                Log.d(TAG,"Target for " + selection +":::"+targetNodes.toString());
+
                 Iterator<String> itr = targetNodes.iterator();
 
                 while(itr.hasNext()){
 
                     try {
 
-                        String returnedDataset = new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
-                                String.valueOf(Integer.parseInt(itr.next())*2)).get();
+                        String target = itr.next();
 
-                        if(!returnedDataset.equals(Constants.FAILED_NODE_INDICATOR)){
+                        String returnedDataset = new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
+                                String.valueOf(Integer.parseInt(target)*2)).get();
+
+
+
+                        if(returnedDataset.length()==0){
+
+                            Log.e(TAG,"Returned from " +target+ " for " + selection +":::"+returnedDataset);
+
+//                            throw new RuntimeException("This is a crash");
+
+
+
+                        }
+
+                        if(!returnedDataset.equals(Constants.FAILED_NODE_INDICATOR)  && returnedDataset.length()>0){
                             hm = providerHelper.convertPacketsToKeyPair(returnedDataset);
-                            break;
+
+                            // get data from all nodes, so don't use break
+                            //break;
 
                         }
 
@@ -404,6 +430,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             while(itr.hasNext()){
 
+                // TODO: lazy put
+
                 new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
                         String.valueOf(Integer.parseInt(itr.next())*2));
 
@@ -421,6 +449,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 	private void replicateSiblings(){
 
         try {
+
+            //TODO: only get new files
 
             LinkedHashSet<String> siblingNodes = providerHelper.getSiblingNodes(MY_PORT, ringStructure);
 
@@ -453,21 +483,29 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             }
 
-            providerHelper.deleteAllLocalData(getContext());
+
 
             List<Message>  msgList = providerHelper.convertPacketToMessageList(result.toString());
 
-            for(Message msg: msgList){
+            List<Message> myMsgList = new ArrayList<Message>();
 
+            for(Message msg: msgList){
 
                 LinkedHashSet<String> targetNodes = providerHelper.getTargetNodesForKey(msg, ringStructure);
 
                 if(targetNodes.contains(MACHINE_ID)){
-                    providerHelper.saveKeyPairInDataStore(msg, getContext());
+
+                    myMsgList.add(msg);
+
                 }
 
 
             }
+
+
+            providerHelper.saveKeyPairListInDataStore(myMsgList, getContext());
+
+
 
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();

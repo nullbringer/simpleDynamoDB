@@ -77,12 +77,28 @@ public class ProviderHelper {
 
     public void saveKeyPairInDataStore(Message message, Context context){
 
+        //TODO:: councurret write?
+
         SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
 
         editor.putString(message.getKey() + Constants.KEY_VERSION_SEPARATOR + message.getOriginTimestamp(),
                 message.getValue());
 
+        editor.apply();
+    }
+
+    public void saveKeyPairListInDataStore(List<Message> myMsgList, Context context) {
+
+        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPref.edit();
+
+        for (Message message:myMsgList){
+
+            editor.putString(message.getKey() + Constants.KEY_VERSION_SEPARATOR + message.getOriginTimestamp(),
+                    message.getValue());
+
+        }
         editor.apply();
     }
 
@@ -324,7 +340,6 @@ public class ProviderHelper {
         }
         return formatter.toString();
     }
-
 
 
 }
