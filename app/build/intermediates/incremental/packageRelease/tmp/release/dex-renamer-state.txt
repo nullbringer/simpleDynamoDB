@@ -1,4 +1,4 @@
-#Sun Apr 14 18:29:44 EDT 2019
+#Sat Apr 27 00:15:19 EDT 2019
 base.0=/Users/amlan/Documents/codebase/github/UB_Courses/CSE_586_Distributed_Systems/PA4/SimpleDynamo/app/build/intermediates/dex/release/mergeDexRelease/out
 path.0=classes.dex
 renamed.0=classes.dex

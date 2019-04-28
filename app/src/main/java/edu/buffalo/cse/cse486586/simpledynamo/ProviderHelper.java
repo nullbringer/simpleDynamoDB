@@ -13,7 +13,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Formatter;
 import java.util.HashMap;
@@ -28,116 +27,219 @@ import java.util.TreeMap;
 public class ProviderHelper {
 
 
-    /*
-     * Establish connecton to another node and write send a String
-     * */
+    private String dbMode = Constants.DB_MODE_FREE;
 
-    public Socket connectAndWriteMessege(int thisPort, String msg) throws IOException {
-
-        Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
-                thisPort);
-
-        socket.setSoTimeout(Constants.SOCKET_READ_TIMEOUT);
-
-        DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
-        dataOutputStream.writeUTF(msg);
-        dataOutputStream.flush();
-
-        return socket;
-
-    }
-
-    public String readAckAndClose(Socket socket) throws IOException {
-
-        DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
-
-        String reply = dataInputStream.readUTF();
-
-        /*
-         * Received data from successor!
-         * */
+    private int writerWaiting = 0;
 
 
-        dataInputStream.close();
-        return reply;
 
-    }
-
-    /* Writes standard ACK in open channel */
-
-    public void returnStandardAcknoldegement(Socket clientSocket) throws IOException{
-
-        DataOutputStream dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
-        dataOutputStream.writeUTF(Constants.ACK_VALUE);
-        dataOutputStream.flush();
-
-        dataOutputStream.close();
-
-    }
 
     public void saveKeyPairInDataStore(Message message, Context context){
 
-        //TODO:: councurret write?
 
-        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPref.edit();
-
-        editor.putString(message.getKey() + Constants.KEY_VERSION_SEPARATOR + message.getOriginTimestamp(),
-                message.getValue());
-
-        editor.apply();
-    }
-
-    public void saveKeyPairListInDataStore(List<Message> myMsgList, Context context) {
-
-        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPref.edit();
-
-        for (Message message:myMsgList){
+        if (isReadyToWrite()) {
+            SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPref.edit();
 
             editor.putString(message.getKey() + Constants.KEY_VERSION_SEPARATOR + message.getOriginTimestamp(),
                     message.getValue());
 
+            editor.apply();
         }
-        editor.apply();
+
+        freeDataBaseLock();
+    }
+
+    public void saveKeyPairListInDataStore(List<Message> myMsgList, Context context) {
+
+        if (isReadyToWrite()) {
+            SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPref.edit();
+
+            for (Message message:myMsgList){
+
+                editor.putString(message.getKey() + Constants.KEY_VERSION_SEPARATOR + message.getOriginTimestamp(),
+                        message.getValue());
+
+            }
+            editor.apply();
+        }
+
+        freeDataBaseLock();
     }
 
     public void deleteAllLocalData(Context context){
 
-        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPref.edit();
-        editor.clear();
-        editor.apply();
+        if(isReadyToWrite()){
+
+            SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPref.edit();
+            editor.clear();
+            editor.apply();
+
+
+        }
+
+        freeDataBaseLock();
+
+
     }
+
 
     public void deleteDataByKey(Message message, Context context){
 
-        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+        if (isReadyToWrite()) {
+            SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
 
-        HashSet<String> keysToDelete = new HashSet<String>();
+            HashSet<String> keysToDelete = new HashSet<String>();
 
-        Map<String, ?> keys = sharedPref.getAll();
+            Map<String, ?> keys = sharedPref.getAll();
 
-        for (Map.Entry<String, ?> entry : keys.entrySet()) {
+            for (Map.Entry<String, ?> entry : keys.entrySet()) {
 
-            if(entry.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0].equals(message.getKey())){
-                keysToDelete.add(entry.getKey());
+                if(entry.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0].equals(message.getKey())){
+                    keysToDelete.add(entry.getKey());
+
+                }
 
             }
 
+            SharedPreferences.Editor editor = sharedPref.edit();
+
+            Iterator<String> itr = keysToDelete.iterator();
+
+            while(itr.hasNext()){
+                editor.remove(itr.next());
+
+            }
+
+            editor.apply();
         }
 
-        SharedPreferences.Editor editor = sharedPref.edit();
+        freeDataBaseLock();
 
-        Iterator<String> itr = keysToDelete.iterator();
+    }
 
-        while(itr.hasNext()){
-            editor.remove(itr.next());
+    public String getAllLocalData(Context context) {
+
+        HashMap<String, String> hm = new HashMap<String, String>();
+
+        if (isReadyToRead()) {
+            SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+
+            Map<String, ?> keys = sharedPref.getAll();
+
+            for (Map.Entry<String, ?> entry : keys.entrySet()) {
+
+                hm.put(entry.getKey(), entry.getValue().toString());
+
+            }
+        }
+
+        freeDataBaseLock();
+
+        return convertMessageListToPacket(hm);
+
+    }
+
+
+    public String getDataByKey(Message message, Context context) {
+
+        HashMap<String, String> hm = new HashMap<String, String>();
+
+        if (isReadyToRead()) {
+            SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
+
+            Map<String, ?> keys = sharedPref.getAll();
+
+            for (Map.Entry<String, ?> entry : keys.entrySet()) {
+
+                if(entry.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0].equals(message.getKey())){
+                    hm.put(entry.getKey(), entry.getValue().toString());
+
+                }
+
+            }
+        }
+
+        freeDataBaseLock();
+
+        return convertMessageListToPacket(hm);
+
+    }
+
+
+    private boolean isReadyToRead() {
+
+        synchronized (this) {
+            while(true){
+
+                if(!this.dbMode.equals(Constants.DB_MODE_WRITE) && writerWaiting<1){
+                    int readerNo = 1;
+
+                    if(this.dbMode.contains(Constants.DB_MODE_READ)){
+
+                        String [] temp = this.dbMode.split(Constants.SEPARATOR);
+
+                        readerNo = Integer.parseInt(temp[1]);
+                        readerNo++;
+
+
+                    }
+
+                    this.dbMode = Constants.DB_MODE_READ + Constants.SEPARATOR + String.valueOf(readerNo);
+                    return true;
+
+                }
+            }
+        }
+
+
+    }
+
+
+    private boolean isReadyToWrite() {
+
+        writerWaiting++;
+
+        synchronized (this) {
+
+            while(true){
+
+                if(this.dbMode.equals(Constants.DB_MODE_FREE)){
+
+                    this.dbMode = Constants.DB_MODE_WRITE;
+                    this.writerWaiting--;
+                    return true;
+
+                }
+            }
+        }
+
+
+    }
+
+
+    private void freeDataBaseLock(){
+
+
+        if(this.dbMode.contains(Constants.DB_MODE_READ)){
+
+            String [] temp = this.dbMode.split(Constants.SEPARATOR);
+
+            int readerNo = Integer.parseInt(temp[1]);
+            readerNo--;
+
+
+            if(readerNo>0) {
+                this.dbMode = Constants.DB_MODE_READ + Constants.SEPARATOR + String.valueOf(readerNo);
+                return;
+            }
+
 
         }
 
-        editor.apply();
-
+        this.dbMode = Constants.DB_MODE_FREE;
     }
 
     public LinkedHashMap<String, String> convertPacketsToKeyPair(String packets) {
@@ -173,45 +275,7 @@ public class ProviderHelper {
         return hm;
     }
 
-    public String getAllLocalData(Context context) {
 
-        HashMap<String, String> hm = new HashMap<String, String>();
-
-        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
-
-        Map<String, ?> keys = sharedPref.getAll();
-
-        for (Map.Entry<String, ?> entry : keys.entrySet()) {
-
-            hm.put(entry.getKey(), entry.getValue().toString());
-
-        }
-
-        return convertMessageListToPacket(hm);
-
-    }
-
-
-    public String getDataByKey(Message message, Context context) {
-
-        HashMap<String, String> hm = new HashMap<String, String>();
-
-        SharedPreferences sharedPref = context.getSharedPreferences(Constants.PREFERENCE_FILE, Context.MODE_PRIVATE);
-
-        Map<String, ?> keys = sharedPref.getAll();
-
-        for (Map.Entry<String, ?> entry : keys.entrySet()) {
-
-            if(entry.getKey().split(Constants.KEY_VERSION_SEPARATOR)[0].equals(message.getKey())){
-                hm.put(entry.getKey(), entry.getValue().toString());
-
-            }
-
-        }
-
-        return convertMessageListToPacket(hm);
-
-    }
 
     public void returnPacketAsAcknoldegement(Socket clientSocket, String packets) throws IOException{
 
@@ -328,6 +392,53 @@ public class ProviderHelper {
         targetNodes.add(getPrevNode(machineId,ringStructure));
 
         return targetNodes;
+    }
+
+    /*
+     * Establish connecton to another node and write send a String
+     * */
+
+    public Socket connectAndWriteMessege(int thisPort, String msg) throws IOException {
+
+        Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
+                thisPort);
+
+        socket.setSoTimeout(Constants.SOCKET_READ_TIMEOUT);
+
+        DataOutputStream dataOutputStream = new DataOutputStream(socket.getOutputStream());
+        dataOutputStream.writeUTF(msg);
+        dataOutputStream.flush();
+
+        return socket;
+
+    }
+
+    public String readAckAndClose(Socket socket) throws IOException {
+
+        DataInputStream dataInputStream = new DataInputStream(socket.getInputStream());
+
+        String reply = dataInputStream.readUTF();
+
+        /*
+         * Received data from successor!
+         * */
+
+
+        dataInputStream.close();
+        return reply;
+
+    }
+
+    /* Writes standard ACK in open channel */
+
+    public void returnStandardAcknoldegement(Socket clientSocket) throws IOException{
+
+        DataOutputStream dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+        dataOutputStream.writeUTF(Constants.ACK_VALUE);
+        dataOutputStream.flush();
+
+        dataOutputStream.close();
+
     }
 
 

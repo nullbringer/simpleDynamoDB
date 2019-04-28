@@ -36,10 +36,12 @@ public class SimpleDynamoProvider extends ContentProvider {
     private static String MACHINE_ID;
 	private static TreeMap<String, String> ringStructure = new TreeMap<String, String>();
 
-	private ProviderHelper providerHelper = new ProviderHelper();
+	private ProviderHelper providerHelper;
 
     @Override
     public boolean onCreate() {
+
+        providerHelper = new ProviderHelper();
 
 
         // get my port
@@ -51,8 +53,7 @@ public class SimpleDynamoProvider extends ContentProvider {
         try {
 
 
-            //TODO: clear all local data commentede
-            //providerHelper.deleteAllLocalData(getContext());
+            providerHelper.deleteAllLocalData(getContext());
 
 
 
@@ -64,15 +65,14 @@ public class SimpleDynamoProvider extends ContentProvider {
             ringStructure.put(providerHelper.genHash("5562"),"5562");
 
 
+
             /* Create server */
 
             ServerSocket serverSocket = new ServerSocket(Constants.SERVER_PORT);
             new ServerTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, serverSocket);
 
 
-            /* get data from siblings and replicate */
 
-            replicateSiblings();
 
 
         } catch (NoSuchAlgorithmException e) {
@@ -80,6 +80,11 @@ public class SimpleDynamoProvider extends ContentProvider {
         } catch(IOException e){
             Log.e(TAG,"Could not create Server!");
         }
+
+
+        /* get data from siblings and replicate */
+
+        replicateSiblings();
 
 
         return true;
@@ -430,8 +435,6 @@ public class SimpleDynamoProvider extends ContentProvider {
 
             while(itr.hasNext()){
 
-                // TODO: lazy put
-
                 new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, message.createPacket(),
                         String.valueOf(Integer.parseInt(itr.next())*2));
 
@@ -449,8 +452,6 @@ public class SimpleDynamoProvider extends ContentProvider {
 	private void replicateSiblings(){
 
         try {
-
-            //TODO: only get new files
 
             LinkedHashSet<String> siblingNodes = providerHelper.getSiblingNodes(MY_PORT, ringStructure);
 

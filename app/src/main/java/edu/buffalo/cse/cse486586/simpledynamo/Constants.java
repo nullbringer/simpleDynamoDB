@@ -24,6 +24,11 @@ public class Constants {
     public static final String FAILED_NODE_INDICATOR = "FAILED!!!";
 
 
+    public static final String DB_MODE_FREE = "F";
+    public static final String DB_MODE_READ = "R";
+    public static final String DB_MODE_WRITE = "W";
+
+
 
 
 
